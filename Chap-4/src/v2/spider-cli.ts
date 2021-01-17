@@ -1,11 +1,12 @@
-import { spider } from "./spider";
+import { spider } from './spider';
 
-spider(process.argv[2], (err, filename, downloaded) => {
+const url = process.argv[2];
+const nesting = Number.parseInt(process.argv[3], 10) || 1;
+
+spider(url, nesting, (err) => {
   if (err) {
     console.error(err);
-  } else if (downloaded) {
-    console.log(`Completed the download of "${filename}"`);
-  } else {
-    console.log(`"${filename}" was already downloaded`);
   }
+
+  console.log('Downloaded successfully');
 });

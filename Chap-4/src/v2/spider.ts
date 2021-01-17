@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as superagent from 'superagent';
 import * as mkdirp from 'mkdirp';
-import { urlToFilename } from './utils';
+import { getPageLinks, urlToFilename } from './utils';
 
 function saveFile(filename: string, content: string, cb: (err: Error | null) => void) {
   mkdirp(path.dirname(filename))
@@ -33,21 +33,55 @@ function download(
   });
 }
 
-export function spider(
-  url: string,
-  cb: (err: Error | null, filename?: string, downloaded?: boolean) => void
-) {
+export function spider(url: string, nesting: number, cb: (err: Error | null) => void) {
   const filename = path.join(__dirname, 'result', urlToFilename(url));
-  fs.access(filename, (err) => {
-    if (!err || err.code !== 'ENOENT') {
-      return cb(null, filename, false);
-    }
-    download(url, filename, (err) => {
-      if (err) {
+  fs.readFile(filename, 'utf8', (err, fileContent) => {
+    if (err) {
+      if (err.code !== 'ENOENT') {
         return cb(err);
       }
 
-      cb(null, filename, true);
-    });
+      return download(url, filename, (err, requestContent) => {
+        if (err) {
+          return cb(err);
+        }
+
+        spiderLinks(url, requestContent, nesting, cb);
+      });
+    }
+
+    spiderLinks(url, fileContent, nesting, cb);
   });
+}
+
+function spiderLinks(
+  url: string,
+  body: string | undefined,
+  nesting: number,
+  cb: (err: Error | null) => void
+): void {
+  if (nesting === 0 || !body) {
+    return process.nextTick(() => cb(null));
+  }
+
+  const links = getPageLinks(url, body);
+  if (links.length === 0) {
+    return process.nextTick(cb);
+  }
+
+  function iterate(index: number) {
+    if (index === links.length) {
+      return cb(null);
+    }
+    console.log(`Downloading links ${links[index]} (${index + 1}/${links.length})`);
+
+    spider(links[index], nesting - 1, (err) => {
+      if (err) {
+        return cb(err);
+      }
+      iterate(index + 1);
+    });
+  }
+
+  iterate(0);
 }
