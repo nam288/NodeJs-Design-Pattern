@@ -33,7 +33,14 @@ function download(
   });
 }
 
+const cache = new Set<string>();
+
 export function spider(url: string, nesting: number, cb: (err: Error | null) => void) {
+  if (cache.has(url)) {
+    return process.nextTick(cb);
+  }
+  cache.add(url);
+
   const filename = path.join(__dirname, 'result', urlToFilename(url));
   fs.readFile(filename, 'utf8', (err, fileContent) => {
     if (err) {
